@@ -2,12 +2,10 @@
 /**
  * Encode and decode data in BitTorrent format
  *
- * Based on
+ * Partially based on
  *   File_Bittorrent2 PEAR package by Markus Tacker <m@tacker.org>
- * Based on
- *   Original Python implementation by Petru Paler <petru@paler.net>
- *   PHP translation by Gerard Krijgsman <webmaster@animesuki.com>
- *   Gerard's regular expressions removed by Carl Ritson <critson@perlfu.co.uk>
+ * Partially based on
+ *   OpenTracker by WhitSoft: http://www.whitsoftdev.com/opentracker/
  * BEncoding is a simple, easy to implement method of associating
  * data types with information in a file. The values in a torrent
  * file are bEncoded.
@@ -15,7 +13,6 @@
  * Integers, Strings, Lists and Dictionaries.
  * [http://www.monduna.com/bt/faq.html]
  *
- * @author Markus Tacker <m@tacker.org>
  * @author Andrey Eroftiev <sparxxx.at@gmail.com>
  * @version $Id$
  */
@@ -125,75 +122,117 @@ class BEncoder {
 	}
 	
 	/**
-    * Decode a Bencoded string
-    *
-    * @param string
-    * @return mixed
-    * @throws TODO: make it throw smth
-    */
-	public static function bdecode($str, &$position = 0) {
-		switch ($str[$position]) {
-			case 'i':
-				return self::bdecode_integer($str, $position);
-			case 'l':
-				return self::bdecode_list($str, $position);
-			case 'd':
-				return self::bdecode_dictionary($str, $position);
-			default:
-				return self::bdecode_string($str, $position);
-		}
+     * Decode a Bencoded string
+     *
+     * @param string $str
+     * @return mixed decoded data
+     * @throws TODO: make it throw smth
+     */
+	public static function bdecode($str) {
+		$pos = 0;
+		return self::bdecode_r($str, $pos);
 	}
 	
 	/**
-	 * Decode a BEncoded integer
+	 * Decode a BEncoded string recursively
 	 * 
-	 * Integers are prefixed with an i and terminated by an e.
-	 * For example, 123 would bEncode to i123e, -3272002 would bEncode
-	 * to i-3272002e.
-	 * 
-	 * @param string
-	 * @return int
-	 * @throws TODO: make it throw smth on invalid input
+	 * @param string $str string to decode
+	 * @param int $pos current position
+	 * @return mixed decoded data
 	 */
-	private static function bdecode_integer($str, &$position = 0) {
-		if ($position >= strlen($str) ||
-			$str[$position] != 'i' ||
-			strpos($str, 'e', $position) === false) {
-			// TODO: throw exception
+	private static function bdecode_r($str, &$pos) {
+		$strlen = strlen($str);
+		if (($pos < 0) || ($pos >= $strlen)) {
+			// TODO: throw exception instead of returning null
+			return null;
 		}
-		$result = substr($str, $position + 1, strpos($str, 'e', $position) - 1) + 0;
-		$position = strpos($str, 'e', $position) + 1;
-		return $result;
-	}
-	
-	/**
-	 * Decode a BEncoded list
-	 * 
-	 * Lists are prefixed with a l and terminated by an e. The list
-	 * should contain a series of bEncoded elements. For example, the
-	 * list of strings ["Monduna", "Bit", "Torrents"] would bEncode to
-	 * l7:Monduna3:Bit8:Torrentse. The list [1, "Monduna", 3, ["Sub", "List"]]
-	 * would bEncode to li1e7:Mondunai3el3:Sub4:Listee
-	 * 
-	 * @param string
-	 * @return array
-	 * @throws TODO: make it throw smth on invalid input
-	 */
-	private static function bdecode_list($str, &$position = 0) {
-		$result = array();
-		if ($position >= strlen($str) ||
-			$str[$position] != 'l' ||
-			strpos($str, 'e', $position) === false) {
-			// TODO: throw exception
+		else if ($str[$pos] == 'i') {
+			$pos++;
+			$numlen = strspn($str, '-0123456789', $pos);
+			$spos = $pos;
+			$pos += $numlen;
+			if (($pos >= $strlen) || ($str[$pos] != 'e')) {
+				// TODO: throw exception instead of returning null
+				return null;
+			}
+			else {
+				$pos++;
+				return intval(substr($str, $spos, $numlen));
+			}
 		}
-		for ($position++; $str[$position] != 'e' && $position < $strlen($str); ) {
-			$value = self::bdecode($str, $position);
-			$result[] = $value;
+		else if ($str[$pos] == 'd') {
+			$pos++;
+			$ret = array();
+			while ($pos < $strlen) {
+				if ($str[$pos] == 'e') {
+					$pos++;
+					return $ret;
+				}
+				else {
+					$key = self::bdecode_r($str, $pos);
+					if (is_null($key)) {
+						// TODO: throw exception instead of returning null
+						return null;
+					}
+					else {
+						$val = self::bdecode_r($str, $pos);
+						if (is_null($val)) {
+							// TODO: throw exception instead of returning null
+							return null;
+						}
+						else if (!is_array($key)) {
+							$ret[$key] = $val;
+						}
+					}
+				}
+			}
+			// TODO: throw exception instead of returning null
+			return null;
 		}
-		if ($position >= strlen($str) || $str[$position] != 'e') {
-			// TODO: throw ecxeption
+		else if ($str[$pos] == 'l') {
+			$pos++;
+			$ret = array();
+			while ($pos < $strlen) {
+				if ($str[$pos] == 'e') {
+					$pos++;
+					return $ret;
+				}
+				else {
+					$val = self::bdecode_r($str, $pos);
+					if (is_null($val)) {
+						// TODO: throw exception instead of returning null
+						return null;
+					}
+					else {
+						$ret[] = $val;
+					}
+				}
+			}
+			// TODO: throw exception instead of returning null
+			return null;
 		}
-		return $result;
+		else {
+			$numlen = strspn($str, '0123456789', $pos);
+			$spos = $pos;
+			$pos += $numlen;
+			if (($pos >= $strlen) || ($str[$pos] != ':')) {
+				// TODO: throw exception instead of returning null
+				return null;
+			}
+			else {
+				$vallen = intval(substr($str, $spos, $numlen));
+				$pos++;
+				$val = substr($str, $pos, $vallen);
+				if (strlen($val) != $vallen) {
+					// TODO: throw exception instead of returning null
+					return null;
+				}
+				else {
+					$pos += $vallen;
+					return $val;
+				}
+			}
+		}
 	}
 }
 
