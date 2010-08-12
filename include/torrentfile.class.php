@@ -5,5 +5,4 @@
  * @version $Id$
  */
 class TorrentFile {
-	
 }
