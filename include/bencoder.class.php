@@ -5,7 +5,7 @@
  * Partially based on
  *   File_Bittorrent2 PEAR package by Markus Tacker <m@tacker.org>
  * Partially based on
- *   OpenTracker by WhitSoft: http://www.whitsoftdev.com/opentracker/
+ *   OpenTracker by WhitSoft [http://www.whitsoftdev.com/opentracker/]
  * BEncoding is a simple, easy to implement method of associating
  * data types with information in a file. The values in a torrent
  * file are bEncoded.
@@ -48,8 +48,8 @@ class BEncoder {
 	 * For example, "Monduna" would bEncode to 7:Monduna and "BitTorrents"
 	 * would bEncode to 11:BitTorrents.
 	 * 
-	 * @param $str
-	 * @return unknown_type
+	 * @param $str string
+	 * @return string
 	 */
 	private static function bencode_string($str) {
 		return strlen($str) . ':' . $str;
